@@ -3,11 +3,26 @@ import haversine as hs
 from data import cities_data, deport_city, deport_city_coordinates, num_of_vehicle, vehicle_capacity
 import random
 import pprint
+import copy
+from collections import Counter
 
 
 def split_to_sublist(flat_arr, number):
     n = len(flat_arr) // number
     return [flat_arr[i:i + n] for i in range(0, len(flat_arr), n)]
+
+
+def split_to_random_size_sublists(flat_arr, number):
+    tracks = []
+    index = 0
+    for i in range(number - 1):
+        random_num = random.randrange(3, 7)
+        tracks.append(flat_arr[index: index + random_num])
+        index = index + random_num
+
+    tracks.append(flat_arr[index:])
+    return tracks
+
 
 
 
@@ -72,6 +87,13 @@ class VRP():
             
             if sum_capacity_per_vehicle > self.vehicle_capacity:
                 return False
+
+        c = Counter( city for row in arr_track for city in row )
+        if len(set(c.values())) != 1:
+            return False
+
+        if len(c.keys()) != len(cities_data.keys()):
+            return False
             
         return True
 
@@ -84,7 +106,8 @@ class VRP():
             shuffled_cities = cities[:]
             while True:
                 random.shuffle(shuffled_cities)
-                track = split_to_sublist(shuffled_cities, num_of_vehicle)
+                # track = split_to_sublist(shuffled_cities, num_of_vehicle)
+                track = split_to_random_size_sublists(shuffled_cities, num_of_vehicle)
                 if self.check_if_solution_valid(track) == True:
                     print('znaleziono random solution')
                     break
@@ -120,21 +143,61 @@ class VRP():
         return city_permutations
 
 
+    def cross_solutions2(self, city_permutations):
+        random_solutions = [] # wybierz grupy scieżek do krzyżowania
+        for i in range(2):
+            random_solutions.append(random.randrange(0, len(city_permutations)))
+        
+        # wybież ktore drogi w obrebie wybraneg rozwiązania pojda do krzyżowania
+        random_track_no = random.randrange(0, len(city_permutations[0]['tracks'])-1)
+
+        new_solution = city_permutations[random_solutions[0]]['tracks'][0:random_track_no]
+        new_solution_cities = [city for row in new_solution for city in row]
+        cities_remainder = []
+        for track in city_permutations[random_solutions[1]]['tracks']:
+            for city in track:
+                if city not in new_solution_cities:
+                    cities_remainder.append(city)
+
+        # new_solution_cities += cities_remainder
+
+        available_cars = self.num_of_vehicles - random_track_no
+        new_cities_remainder = split_to_sublist(cities_remainder, available_cars)
+        new_solution += new_cities_remainder
+        new_solution_sum_distance = self.sum_final_distance(new_solution)
+        solution_and_distance = {'tracks': new_solution, 'dist': new_solution_sum_distance}
+        if self.check_if_solution_valid(new_solution):
+            print('dodaje nowe solution')
+            print('solution valid')
+            city_permutations.append(solution_and_distance)
+        return city_permutations
+
+
     def mutate(self, city_permutations):
+        c_p_copy = copy.deepcopy(city_permutations)
+
         track_to_mutate_no = random.randrange(0, len(city_permutations))
-        track_to_mutate = [city for row in city_permutations[track_to_mutate_no]['tracks'] for city in row]
-        swap_city_1 = random.randrange(0, len(track_to_mutate))
-        swap_city_2 = random.randrange(0, len(track_to_mutate))
-        while swap_city_2 == swap_city_1:
-            swap_city_2 = random.randrange(0, len(track_to_mutate))
+        
+        swap_car_1 = random.randrange(0, len(city_permutations[track_to_mutate_no]['tracks']))
+        swap_city_1 = random.randrange(0, len(city_permutations[track_to_mutate_no]['tracks'][swap_car_1]))
+        swap_car_2 = random.randrange(0, len(city_permutations[track_to_mutate_no]['tracks']))
+        swap_city_2 = random.randrange(0, len(city_permutations[track_to_mutate_no]['tracks'][swap_car_2]))
+        while swap_car_1 == swap_car_2 and swap_city_1 == swap_city_2:
+            swap_car_1 = random.randrange(0, len(city_permutations[track_to_mutate_no]['tracks']))
+            swap_city_1 = random.randrange(0, len(city_permutations[track_to_mutate_no]['tracks'][swap_car_1]))
+            swap_car_2 = random.randrange(0, len(city_permutations[track_to_mutate_no]['tracks']))
+            swap_city_2 = random.randrange(0, len(city_permutations[track_to_mutate_no]['tracks'][swap_car_2]))
+        
 
-        track_to_mutate[swap_city_1], track_to_mutate[swap_city_2] = track_to_mutate[swap_city_2], track_to_mutate[swap_city_1]            
+        track_to_mutate = c_p_copy[track_to_mutate_no]['tracks']
+        track_to_mutate[swap_car_1][swap_city_1], track_to_mutate[swap_car_2][swap_city_2] = track_to_mutate[swap_car_2][swap_city_2], track_to_mutate[swap_car_1][swap_city_1]
+        
 
-        mutated_track = split_to_sublist(track_to_mutate, num_of_vehicle)
-        new_distance = self.sum_final_distance(mutated_track)
-        if self.check_if_solution_valid(mutated_track):
-            city_permutations[track_to_mutate_no] = {'tracks': mutated_track, 'dist': new_distance}
+        new_distance = self.sum_final_distance(track_to_mutate)
+        if self.check_if_solution_valid(track_to_mutate):
+            city_permutations[track_to_mutate_no] = {'tracks': track_to_mutate, 'dist': new_distance}
 
+        
         return city_permutations
 
 
@@ -150,7 +213,7 @@ class VRP():
         for generation in range(no_generations):
             print('Generacja: ', generation)
             for cross in range(no_cross):
-                solutions = self.cross_solutions(solutions)
+                solutions = self.cross_solutions2(solutions)
             for mutation in range(no_mutations):
                 solutions = self.mutate(solutions)
             solutions = self.reduce_solutions(solutions, population_size)
@@ -161,4 +224,4 @@ class VRP():
 
 
 vrp = VRP(cities_data, deport_city, deport_city_coordinates, num_of_vehicle, vehicle_capacity)
-vrp.genetic_algorithm(10, 1000, 5, 3)
+vrp.genetic_algorithm(10, 1000, 5, 3) # te parametry trzeba zmieniac zeby znalezc nakrotsza droge
