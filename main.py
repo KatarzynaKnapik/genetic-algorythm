@@ -9,7 +9,12 @@ from collections import Counter
 
 def split_to_sublist(flat_arr, number):
     n = len(flat_arr) // number
-    return [flat_arr[i:i + n] for i in range(0, len(flat_arr), n)]
+    b = [flat_arr[i:i + n] for i in range(0, len(flat_arr), n)]
+    c = b[:number]
+    if len(b) > number:
+        for i in range(len(b[number])):
+            c[i].append(b[number][i])
+    return c
 
 
 def split_to_random_size_sublists(flat_arr, number):
@@ -162,6 +167,7 @@ class VRP():
         # new_solution_cities += cities_remainder
 
         available_cars = self.num_of_vehicles - random_track_no
+        # available_cars = self.num_of_vehicles - len(new_solution)
         new_cities_remainder = split_to_sublist(cities_remainder, available_cars)
         new_solution += new_cities_remainder
         new_solution_sum_distance = self.sum_final_distance(new_solution)
@@ -224,4 +230,4 @@ class VRP():
 
 
 vrp = VRP(cities_data, deport_city, deport_city_coordinates, num_of_vehicle, vehicle_capacity)
-vrp.genetic_algorithm(10, 1000, 5, 3) # te parametry trzeba zmieniac zeby znalezc nakrotsza droge
+vrp.genetic_algorithm(10, 1000, 15, 3) # te parametry trzeba zmieniac zeby znalezc nakrotsza droge
