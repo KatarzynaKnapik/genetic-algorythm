@@ -213,7 +213,7 @@ class VRP():
         return city_permutations
 
 
-    def genetic_algorithm(self, population_size, no_generations, no_cross, no_mutations):
+    def genetic_algorithm(self, population_size, no_generations, no_cross, no_mutations, print_stuff = True):
         print('-------START----------')
         solutions = self.create_random_solutions(population_size)
         for generation in range(no_generations):
@@ -225,9 +225,28 @@ class VRP():
             solutions = self.reduce_solutions(solutions, population_size)
             # pprint.pprint(solutions)
             # pprint.pprint([round(track['dist']) for track in solutions])
-            pprint.pprint(solutions[0])
-
-
+            if print_stuff:
+                pprint.pprint(solutions[0])
+        return solutions[0]
 
 vrp = VRP(cities_data, deport_city, deport_city_coordinates, num_of_vehicle, vehicle_capacity)
-vrp.genetic_algorithm(10, 1000, 15, 3) # te parametry trzeba zmieniac zeby znalezc nakrotsza droge
+# vrp.genetic_algorithm(10, 1000, 5, 3) # te parametry trzeba zmieniac zeby znalezc nakrotsza droge
+
+solutions = []
+
+for population_size in range(5, 21, 5):
+    for no_generation in range(500, 2001, 500):
+        for no_cross in range(3, 6):
+            for no_mutations in range(2, 4):
+                solutions.append(
+                    {
+                        'solution': vrp.genetic_algorithm(population_size, no_generation, no_cross, no_mutations, False),
+                        'params': { 'population_size': population_size, 'generations': no_generation, 'no_cross': no_cross, 'no_mutations': no_mutations }
+                    }) # te parametry trzeba zmieniac zeby znalezc nakrotsza droge
+
+solutions = sorted(solutions, key=lambda x: x['solution']['dist'])
+
+print("Best:")
+pprint.pprint(solutions[0])
+print("Worst:")
+pprint.pprint(solutions[len(solutions) - 1])
